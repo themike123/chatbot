@@ -4,25 +4,28 @@ from flask.helpers import flash
 import requests
 import os
 
+#####import for cript 
+from cryptography.fernet import Fernet
+from twofish import Twofish
+import bcrypt
+#####
+
+
 from dotenv import load_dotenv
 load_dotenv() 
 
 app = Flask (__name__)
 
 @app.route('/')
-def hello_word():
+def index():
     print( os.environ.get("VERIFY_TOKEN_FACEBOOK") )
     return 'CHATBOT'
 
-def get_bot_response(message):
-    """This is just a dummy function, returning a variation of what
-    the user said. Replace this function with one connected to chatbot."""
-    return "This is a dummy response to '{}'".format(message)
-
+def get_bot_response(message):    
+    return "Esta es la respuesta de: '{}'".format(message)
 
 
 def verify_webhook(request):
-
     #get attr request
     mode = request.args.get("hub.mode")
     verify_token = request.args.get("hub.verify_token")
@@ -36,9 +39,7 @@ def verify_webhook(request):
         
 
 
-def respond(sender, message):
-    """Formulate a response to the user and
-    pass it on to a function that sends it."""
+def respond(sender, message):    
     response = get_bot_response(message)
     send_message(sender, response)
 
@@ -80,20 +81,155 @@ def listen():
     if request.method == 'GET':
         #return response verify_webhook
         return verify_webhook(request)
-    elif request.method == 'POST':
-        payload = request.json
-        event = payload['entry'][0]['messaging']
-        for x in event:
-            if is_user_message(x):
-                text = x['message']['text']
-                sender_id = x['sender']['id']
-                respond(sender_id, text)
+    elif request.method == 'POST':                    
+        #get data
+        data = request.json
 
-        return "ok"
+        if data['object'] == 'page':#Checks if this is an event from a page subscription
+            
+            for x in data['entry'][0]['messaging']:
+
+                # if x['message']:
+                #     handleMessage(x['sender']['id'], x['message'])
+                # elif x['postback']:
+                #     handlePostback(x['sender']['id'], x['postback'])
+
+
+                if is_user_message(x):
+                    text = x['message']['text']
+                    sender_id = x['sender']['id']
+                    respond(sender_id, text)
+
+            return flask.Response('EVENT_RECEIVED',200)
+
+        else:
+            return flask.Response(404)
+
         
     #return flask.Response("Chatbot Grupo Salinas", 200)
 
+def handlePostback(psdi,postback):
+    return "postback"
 
+def handleMessage(psdi, message):
+
+    #Checks if the message contains text
+    if message.text:                
+        response = f'Esta es la respuesta de: {message.text}'
+    elif message.attachments:
+        
+        attachmentUrl = message.attachments[0].payload.url;
+
+        response = {
+            'attachment': {
+                'type': 'template',
+                'payload': {
+                    'template_type': 'generic',
+                    'elements': [{
+                        'title': 'Is this the right picture?',
+                        'subtitle': 'Tap a button to answer.',
+                        'image_url': attachmentUrl,
+                        'buttons': [{
+                            'type': 'postback',
+                            'title': 'Yes!',
+                            'payload': 'yes',
+                        },{
+                            'type': 'postback',
+                            'title': 'No!',
+                            'payload': 'no',
+                        }]
+                    }]
+                }
+            }
+        }
+
+        callSendAPI(psdi, response)
+
+
+def callSendAPI(senderPsid, response):
+    payload = {
+        'message': {
+            'text': response
+        },
+        'recipient': {
+            'id': senderPsid
+        },
+        'notification_type': 'regular'
+    }
+
+    auth = {
+        'access_token': os.environ.get("ACCESS_TOKEN_FACEBOOK")
+    }
+
+    response = requests.post(
+        os.environ.get("API_GRAPH"),
+        params=auth,
+        json=payload
+    )
+
+    return response.json()
+
+
+
+@app.route('/getip',  methods=['GET', 'POST'])
+def getIP():
+    hostname = socket.gethostname()    
+    IPAddr = socket.gethostbyname(hostname) 
+    print(request)
+    return request.remote_addr+" , "+flask.request.remote_addr+", "+ request.environ.get('HTTP_X_REAL_IP', request.remote_addr)+" , "+ hostname +" , "+IPAddr
+
+
+#Nuevo desarrollo
+#Datos a encriptar senderId, Telefono, Id usuario, canal
+#Cifrado Simetrico por bloques: DES(obsoleto), 3DES, AES
+
+
+#RSA en python
+
+#simetrico Blowfish, muy veloz, pero requiere mucho recurso al cambiar la clave 
+#simetrico Twofish, igual de rapido que Blowfish, es popular para dispositivos de bajos recursos, como las tarjetas SIM, y usa claves de cifrado de 
+# hasta 256 bits.
+
+
+key = Fernet.generate_key()
+f = Fernet(key)
+token = f.encrypt(b"Miguel Ramirez Cruz")
+
+print(token)
+print(token.decode('utf-8'))
+word = f.decrypt( token )
+print( word.decode('utf-8') )
+
+
+T = Twofish(b'*secret*')
+x = T.encrypt(b'YELLOWSUBMARINES')
+print(x)
+print(T.decrypt(x).decode())
+
+
+print("/n/n")
+
+password = b"super secret password"
+hashed = bcrypt.hashpw(password, bcrypt.gensalt())
+
+print(hashed)
+
+if bcrypt.checkpw(password, hashed):
+    print("It Matches!")
+else:
+    print("It Does not Match :(")
+
+
+
+print("/n/n")
+
+key = bcrypt.kdf(
+password=b'password',
+salt=b'salt',
+desired_key_bytes=32,
+rounds=100)
+
+print(key)
 
 #Only development(run in terminal: python3 app.py), remove in production
 if __name__ == "__main__":
