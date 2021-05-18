@@ -6,8 +6,15 @@ import os
 
 #####import for cript 
 from cryptography.fernet import Fernet
+
 from twofish import Twofish
 import bcrypt
+import base64, hashlib
+from base64 import b64encode
+import blowfish
+
+
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 #####
 
 
@@ -169,16 +176,6 @@ def callSendAPI(senderPsid, response):
 
     return response.json()
 
-
-
-@app.route('/getip',  methods=['GET', 'POST'])
-def getIP():
-    hostname = socket.gethostname()    
-    IPAddr = socket.gethostbyname(hostname) 
-    print(request)
-    return request.remote_addr+" , "+flask.request.remote_addr+", "+ request.environ.get('HTTP_X_REAL_IP', request.remote_addr)+" , "+ hostname +" , "+IPAddr
-
-
 #Nuevo desarrollo
 #Datos a encriptar senderId, Telefono, Id usuario, canal
 #Cifrado Simetrico por bloques: DES(obsoleto), 3DES, AES
@@ -187,32 +184,42 @@ def getIP():
 #RSA en python
 
 #simetrico Blowfish, muy veloz, pero requiere mucho recurso al cambiar la clave 
-#simetrico Twofish, igual de rapido que Blowfish, es popular para dispositivos de bajos recursos, como las tarjetas SIM, y usa claves de cifrado de 
+#simetrico Twofish(por longitud de trama queda descartado), igual de rapido que Blowfish, es popular para dispositivos de bajos recursos, como las tarjetas SIM, y usa claves de cifrado de 
 # hasta 256 bits.
 
+print("============IIIIIIINNNNNNIIIIIIIICCCCIIIIIOOOO============")
+
+trama = b"{senderId: 454564564654564, telefono: 5295126683331, user_id: 12334323432 , canal: whatsapp }"
 
 key = Fernet.generate_key()
 f = Fernet(key)
-token = f.encrypt(b"Miguel Ramirez Cruz")
+token = f.encrypt( trama )
 
-print(token)
-print(token.decode('utf-8'))
+print("=========================================")
+print(f'Cifrado Fernet: {token}')
 word = f.decrypt( token )
 print( word.decode('utf-8') )
+print("=========================================")
 
 
-T = Twofish(b'*secret*')
-x = T.encrypt(b'YELLOWSUBMARINES')
-print(x)
-print(T.decrypt(x).decode())
+print('Informacion en base64 version 2:'+ b64encode(token).decode('utf-8'))
+
+#byte_string = word.encode('utf-8')
+encoded_data = base64.b64encode(token)
+print(f'Informacion en base64: {encoded_data}')
+
+decoded_data = base64.b64decode(encoded_data)
+print(f'Informacion en fernet: {decoded_data}')
+
+encoded_data32 = base64.b32encode(token)
+print(f'Informacion en base32: {encoded_data}')
 
 
-print("/n/n")
-
-password = b"super secret password"
+#Requirements : sudo apt-get install build-essential libffi-dev python-dev
+print("=========================================")
+password = trama
 hashed = bcrypt.hashpw(password, bcrypt.gensalt())
-
-print(hashed)
+print( f'Bcrypt hash:{hashed}' )
 
 if bcrypt.checkpw(password, hashed):
     print("It Matches!")
@@ -220,16 +227,75 @@ else:
     print("It Does not Match :(")
 
 
+print("=========================================")
 
-print("/n/n")
+
+cipher_little = blowfish.Cipher(b"my key", byte_order = "little")
+
+print(cipher_little)
+
+string_to_hash = '123'
+hash_object = hashlib.sha256(str(string_to_hash).encode('utf-8'))
+print('Hash', hash_object.hexdigest())
+
+
+print("=========================================")
+
+""" key = os.urandom(32)
+iv = os.urandom(16)
+cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
+encryptor = cipher.encryptor()
+ct = encryptor.update(trama) + encryptor.finalize()
+print(ct)
+decryptor = cipher.decryptor()
+decryptor.update(ct) + decryptor.finalize() """
+
+
+print("=========================================")
 
 key = bcrypt.kdf(
-password=b'password',
+password=trama,
 salt=b'salt',
 desired_key_bytes=32,
 rounds=100)
 
 print(key)
+
+print("=========================================")
+#pip3 install pycryptodome
+#pip3 install pycryptodomex
+#pip3 install pycrypto
+
+
+from Crypto.Cipher import AES
+from Crypto.Random import get_random_bytes
+
+key = b'Sixteen byte key'
+cipher = AES.new(key, AES.MODE_EAX)
+
+#nonce = cipher.nonce
+#ciphertext, tag = cipher.encrypt_and_digest(data)
+
+print("=========================================")
+
+import json
+from base64 import b64encode
+from Crypto.Cipher import ChaCha20
+from Crypto.Random import get_random_bytes
+
+plaintext = trama
+key = get_random_bytes(32)
+cipher = ChaCha20.new(key=key)
+ciphertext = cipher.encrypt(plaintext)
+
+print(ciphertext)
+
+nonce = b64encode(cipher.nonce).decode('utf-8')
+
+ct = b64encode(ciphertext).decode('utf-8')
+
+result = json.dumps({'nonce':nonce, 'ciphertext':ct})
+print(result)
 
 #Only development(run in terminal: python3 app.py), remove in production
 if __name__ == "__main__":
