@@ -5,16 +5,25 @@ import requests
 import os
 
 #####import for cript 
+#https://pycryptodome.readthedocs.io/en/latest/src/features.html
 from cryptography.fernet import Fernet
+from requests.api import patch
 
 from twofish import Twofish
 import bcrypt
 import base64, hashlib
-from base64 import b64encode
+
 import blowfish
 
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
+
+import json
+from base64 import b64encode, encode
+from base64 import b64decode
+from Crypto.Cipher import ChaCha20
+from Crypto.Random import get_random_bytes
 #####
 
 
@@ -189,7 +198,7 @@ def callSendAPI(senderPsid, response):
 
 print("============IIIIIIINNNNNNIIIIIIIICCCCIIIIIOOOO============")
 
-trama = b"{senderId: 454564564654564, telefono: 5295126683331, user_id: 12334323432 , canal: whatsapp }"
+trama = b"{senderid: 454564564654564, telefono: 5295126683331, IdCanal: 1 }"
 
 key = Fernet.generate_key()
 f = Fernet(key)
@@ -266,36 +275,93 @@ print("=========================================")
 #pip3 install pycryptodomex
 #pip3 install pycrypto
 
+@app.route('/cifrar',  methods=['GET'])
+def cifrar():    
 
-from Crypto.Cipher import AES
-from Crypto.Random import get_random_bytes
+    plaintext = request.args.get('trama').encode('utf-8')
 
-key = b'Sixteen byte key'
-cipher = AES.new(key, AES.MODE_EAX)
+    key_critpy = os.environ.get("KEY_CHACHA20").encode('utf-8')
+    
+    cipher = ChaCha20.new(key=key_critpy)
+    ciphertext = cipher.encrypt(plaintext)    
 
-#nonce = cipher.nonce
-#ciphertext, tag = cipher.encrypt_and_digest(data)
+    nonce = b64encode(cipher.nonce).decode('utf-8')
+    ct = b64encode(ciphertext).decode('utf-8')
 
-print("=========================================")
+    result = json.dumps({'nonce':nonce, 'ciphertext':ct})
 
-import json
-from base64 import b64encode
-from Crypto.Cipher import ChaCha20
-from Crypto.Random import get_random_bytes
+    return(result)
+
+
+@app.route('/descifar',  methods=['GET'])
+def descifar():
+    try:
+        b64 = json.loads(json_input)
+        nonce = b64decode(b64['nonce'])
+        ciphertext = b64decode(b64['ciphertext'])
+        cipher = ChaCha20.new(key=key, nonce=nonce)
+        plaintext = cipher.decrypt(ciphertext)
+        print("The message was " + plaintext)
+    except ValueError :
+        print("Incorrect decryption")
+
+
+
+
+print("=============================================")
+print("=============================================")
+
 
 plaintext = trama
-key = get_random_bytes(32)
-cipher = ChaCha20.new(key=key)
-ciphertext = cipher.encrypt(plaintext)
 
-print(ciphertext)
+key_critpy = os.environ.get("KEY_CHACHA20").encode('utf-8')
+
+cipher = ChaCha20.new(key=key_critpy)
+ciphertext = cipher.encrypt(plaintext) #return bytes
 
 nonce = b64encode(cipher.nonce).decode('utf-8')
-
 ct = b64encode(ciphertext).decode('utf-8')
 
+
 result = json.dumps({'nonce':nonce, 'ciphertext':ct})
-print(result)
+
+
+
+b64 = json.loads(result)
+
+nonce2 = b64decode(b64['nonce'])
+ciphertext2 = b64decode(b64['ciphertext'])
+
+
+cipher = ChaCha20.new(key=key_critpy, nonce=nonce2)
+plaintext = cipher.decrypt(ciphertext2)
+
+print( plaintext )
+
+
+print("=============================================")
+print("=============================================")
+
+
+plaintext = trama
+secret = os.environ.get("KEY_CHACHA20").encode('utf-8')
+cipher = ChaCha20.new(key=secret)
+msg = cipher.nonce + cipher.encrypt(plaintext)
+
+print( b64encode(msg).decode('utf-8')  )
+print( b64encode(msg) )
+
+print(msg)
+
+msg_nonce = msg[:8]
+ciphertext = msg[8:]
+
+
+cipher2 = ChaCha20.new(key=secret, nonce=msg_nonce)
+plaintext = cipher2.decrypt(ciphertext)
+
+print(plaintext)
+
 
 #Only development(run in terminal: python3 app.py), remove in production
 if __name__ == "__main__":
