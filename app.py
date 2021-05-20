@@ -9,21 +9,14 @@ import os
 from cryptography.fernet import Fernet
 from requests.api import patch
 
-from twofish import Twofish
-import bcrypt
 import base64, hashlib
 
-import blowfish
-
-
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-
-
 import json
-from base64 import b64encode, encode
-from base64 import b64decode
+from base64 import b64encode, b64decode
+
+from requests.models import requote_uri
+#from base64 import #Haber si se quita esto, sino da errores se va
 from Crypto.Cipher import ChaCha20
-from Crypto.Random import get_random_bytes
 #####
 
 
@@ -185,22 +178,12 @@ def callSendAPI(senderPsid, response):
 
     return response.json()
 
-#Nuevo desarrollo
-#Datos a encriptar senderId, Telefono, Id usuario, canal
-#Cifrado Simetrico por bloques: DES(obsoleto), 3DES, AES
-
-
-#RSA en python
-
-#simetrico Blowfish, muy veloz, pero requiere mucho recurso al cambiar la clave 
-#simetrico Twofish(por longitud de trama queda descartado), igual de rapido que Blowfish, es popular para dispositivos de bajos recursos, como las tarjetas SIM, y usa claves de cifrado de 
-# hasta 256 bits.
-
 print("============IIIIIIINNNNNNIIIIIIIICCCCIIIIIOOOO============")
 
 trama = b"{senderid: 454564564654564, telefono: 5295126683331, IdCanal: 1 }"
 
-key = Fernet.generate_key()
+key = os.environ.get("KEY_FERNET").encode('utf-8') # Fernet.generate_key()
+
 f = Fernet(key)
 token = f.encrypt( trama )
 
@@ -211,73 +194,19 @@ print( word.decode('utf-8') )
 print("=========================================")
 
 
-print('Informacion en base64 version 2:'+ b64encode(token).decode('utf-8'))
-
-#byte_string = word.encode('utf-8')
-encoded_data = base64.b64encode(token)
-print(f'Informacion en base64: {encoded_data}')
-
-decoded_data = base64.b64decode(encoded_data)
-print(f'Informacion en fernet: {decoded_data}')
-
-encoded_data32 = base64.b32encode(token)
-print(f'Informacion en base32: {encoded_data}')
-
-
-#Requirements : sudo apt-get install build-essential libffi-dev python-dev
-print("=========================================")
-password = trama
-hashed = bcrypt.hashpw(password, bcrypt.gensalt())
-print( f'Bcrypt hash:{hashed}' )
-
-if bcrypt.checkpw(password, hashed):
-    print("It Matches!")
-else:
-    print("It Does not Match :(")
-
-
-print("=========================================")
-
-
-cipher_little = blowfish.Cipher(b"my key", byte_order = "little")
-
-print(cipher_little)
-
-string_to_hash = '123'
-hash_object = hashlib.sha256(str(string_to_hash).encode('utf-8'))
-print('Hash', hash_object.hexdigest())
-
-
-print("=========================================")
-
-""" key = os.urandom(32)
-iv = os.urandom(16)
-cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
-encryptor = cipher.encryptor()
-ct = encryptor.update(trama) + encryptor.finalize()
-print(ct)
-decryptor = cipher.decryptor()
-decryptor.update(ct) + decryptor.finalize() """
-
-
-print("=========================================")
-
-key = bcrypt.kdf(
-password=trama,
-salt=b'salt',
-desired_key_bytes=32,
-rounds=100)
-
-print(key)
-
-print("=========================================")
 #pip3 install pycryptodome
 #pip3 install pycryptodomex
 #pip3 install pycrypto
 
 @app.route('/cifrar',  methods=['GET'])
-def cifrar():    
+def cifrar():        
+    
+    senderid = request.args.get('senderid')
+    telefono = request.args.get('telefono')
+    idcanal = request.args.get('IdCanal')
 
+    return 
+    
     plaintext = request.args.get('trama').encode('utf-8')
 
     key_critpy = os.environ.get("KEY_CHACHA20").encode('utf-8')
@@ -288,9 +217,20 @@ def cifrar():
     nonce = b64encode(cipher.nonce).decode('utf-8')
     ct = b64encode(ciphertext).decode('utf-8')
 
-    result = json.dumps({'nonce':nonce, 'ciphertext':ct})
-
     return(result)
+
+
+    plaintext = trama
+
+    key_critpy = os.environ.get("KEY_CHACHA20").encode('utf-8')
+
+    cipher = ChaCha20.new(key=key_critpy)
+    ciphertext = cipher.encrypt(plaintext) #return bytes
+
+    nonce = b64encode(cipher.nonce).decode('utf-8')
+    ct = b64encode(ciphertext).decode('utf-8')
+
+    return jsonify(nonce=nonce, ciphertext=ct)
 
 
 @app.route('/descifar',  methods=['GET'])
@@ -306,11 +246,7 @@ def descifar():
         print("Incorrect decryption")
 
 
-
-
 print("=============================================")
-print("=============================================")
-
 
 plaintext = trama
 
@@ -322,10 +258,7 @@ ciphertext = cipher.encrypt(plaintext) #return bytes
 nonce = b64encode(cipher.nonce).decode('utf-8')
 ct = b64encode(ciphertext).decode('utf-8')
 
-
 result = json.dumps({'nonce':nonce, 'ciphertext':ct})
-
-
 
 b64 = json.loads(result)
 
@@ -338,8 +271,6 @@ plaintext = cipher.decrypt(ciphertext2)
 
 print( plaintext )
 
-
-print("=============================================")
 print("=============================================")
 
 
@@ -356,11 +287,11 @@ print(msg)
 msg_nonce = msg[:8]
 ciphertext = msg[8:]
 
-
 cipher2 = ChaCha20.new(key=secret, nonce=msg_nonce)
 plaintext = cipher2.decrypt(ciphertext)
 
 print(plaintext)
+
 
 
 #Only development(run in terminal: python3 app.py), remove in production
