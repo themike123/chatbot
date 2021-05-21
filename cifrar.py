@@ -186,8 +186,10 @@ nonce = get_random_bytes(11)
 cipher = AES.new(key, AES.MODE_CCM, nonce)
 cipher.update(hdr)
 
-msg = nonce, hdr, cipher.encrypt(plaintext), cipher.digest()
+cifrado = cipher.encrypt(plaintext)
 
+msg = nonce, hdr, cifrado, cipher.digest()
+print( (nonce+cifrado).hex() )
 print( f"Esto es el cifrado: {b64encode(msg[2]).decode('utf-8')}")
 
 # We assume that the tuple ``msg`` is transmitted to the receiver:

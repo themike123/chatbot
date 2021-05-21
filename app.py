@@ -1,8 +1,10 @@
 from flask import Flask, request, jsonify
 import flask
 from flask.helpers import flash
+from flask.json import dump
 import requests
 import os
+import time 
 
 #####import for cript 
 #https://pycryptodome.readthedocs.io/en/latest/src/features.html
@@ -178,151 +180,49 @@ def callSendAPI(senderPsid, response):
 
     return response.json()
 
-print("============IIIIIIINNNNNNIIIIIIIICCCCIIIIIOOOO============")
-
-trama = b"{senderid: 454564564654564, telefono: 5295126683331, IdCanal: 1 }"
-
-key = os.environ.get("KEY_FERNET").encode('utf-8') # Fernet.generate_key()
-
-f = Fernet(key)
-token = f.encrypt( trama )
-
-print("=========================================")
-print(f'Cifrado Fernet: {token}')
-word = f.decrypt( token )
-print( word.decode('utf-8') )
-print("=========================================")
-
-
 #pip3 install pycryptodome
 #pip3 install pycryptodomex
 #pip3 install pycrypto
 
 @app.route('/cifrar',  methods=['GET'])
 def cifrar():        
-    try:
-        #senderid = request.args.get('senderid')
-        #telefono = request.args.get('telefono')
-        #idcanal = request.args.get('IdCanal')
+    try:        
 
         senderid = request.args.get('senderid') if 'senderid' in  request.args else ''
         telefono = request.args.get('telefono') if 'telefono' in  request.args else ''
         idcanal = request.args.get('IdCanal') if 'IdCanal' in  request.args else ''
 
-        #data = {'senderid': senderid, 'telefono': telefono, 'idcanal': idcanal}
-        #plaintext = json.dumps(data).encode('utf-8')
-
-        data = '{senderid: '+senderid+', telefono: '+telefono+', idcanal: '+idcanal+'}'
-        #data = '{senderid: 3, telefono: 2, idcanal: 1}'
-        plaintext = data.encode('utf-8')
-
-        print(plaintext)
+        data = {'senderid': senderid, 'telefono': telefono, 'idcanal': idcanal}        
+        plaintext = json.dumps(data).encode('utf-8')#covert list to bytes
 
         key_critpy = os.environ.get("KEY_CHACHA20").encode('utf-8')
         
         cipher = ChaCha20.new(key=key_critpy)
         ciphertext = cipher.encrypt(plaintext)
 
-        print("--------esto se va cifar--------")
-        print(cipher.nonce )
-        print(ciphertext )
+        return jsonify(success=True, data=cipher.nonce.hex()+ciphertext.hex() )
 
-        print(cipher.nonce.hex() )
-        print(ciphertext.hex() )
-        print(cipher.nonce.hex()+ciphertext.hex() )
-
-        print( base64.b64encode( cipher.nonce+ciphertext ).decode('utf-8') )
-
-        print("--------esto se va cifar--------")
-        #return jsonify(success=True, data=b64encode( cipher.nonce+ciphertext ).decode('utf-8') )
-        return jsonify(success=True, data=base64.b64encode( cipher.nonce+ciphertext ).decode('utf-8') )
-    
     except Exception as e:
         return jsonify(success=False,data="", error= str(e))
-        tiempo_final = time()
-        tiempo_ejecucion = round((tiempo_final - tiempo_inicial)*1000 )
-        #logger.new_write_info('"Mensaje": "Se cerró la app" , "servicios":[{"Servicio":"APP","Sistema":"WSDexDigital","Tiempo":'+str(tiempo_ejecucion)+'}], "TiempoTotal":'+ str(tiempo_ejecucion))
 
 
-@app.route('/descifar',  methods=['GET'])
-def descifar():    
+@app.route('/descifar/<trama>',  methods=['GET'])
+def descifar(trama):
 
     try:
-        trama = request.args.get('data')
-        print (bytearray.fromhex(trama) )
-        print( bytes.fromhex(trama) )
         data = bytes.fromhex(trama)
 
         msg_nonce = data[:8]
         ciphertext = data[8:]
 
         cipher2 = ChaCha20.new(key=os.environ.get("KEY_CHACHA20").encode('utf-8'), nonce=msg_nonce)
-        plaintext = cipher2.decrypt(ciphertext)
-
-        return plaintext    
-
-        # trama = request.args.get('data')
-    
-        # data =  b64decode(trama) 
-
-        # msg_nonce = data[:8]
-        # ciphertext = data[8:]
-
-        # cipher2 = ChaCha20.new(key=os.environ.get("KEY_CHACHA20").encode('utf-8'), nonce=msg_nonce)
-        # plaintext = cipher2.decrypt(ciphertext)
-
-        # return plaintext
+        plaintext = cipher2.decrypt(ciphertext)        
+        
+        data = json.loads( plaintext.decode('utf-8') )       
+        return jsonify(success=True, data=data )
 
     except Exception as e:
         return jsonify(success=False,data="", error=str(e))
-
-
-print("=============================================")
-
-plaintext = trama
-
-key_critpy = os.environ.get("KEY_CHACHA20").encode('utf-8')
-
-cipher = ChaCha20.new(key=key_critpy)
-ciphertext = cipher.encrypt(plaintext) #return bytes
-
-
-nonce = b64encode(cipher.nonce).decode('utf-8')
-ct = b64encode(ciphertext).decode('utf-8')
-
-result = json.dumps({'nonce':nonce, 'ciphertext':ct})
-
-b64 = json.loads(result)
-
-nonce2 = b64decode(b64['nonce'])
-ciphertext2 = b64decode(b64['ciphertext'])
-
-
-cipher = ChaCha20.new(key=key_critpy, nonce=nonce2)
-plaintext = cipher.decrypt(ciphertext2)
-
-#print( plaintext )
-
-print("=============================================")
-
-
-plaintext = trama
-secret = os.environ.get("KEY_CHACHA20").encode('utf-8')
-cipher = ChaCha20.new(key=secret)
-msg = cipher.nonce + cipher.encrypt(plaintext)
-
-print(msg)
-print( b64encode(msg).decode('utf-8')  )
-
-
-
-msg_nonce = msg[:8]
-ciphertext = msg[8:]
-
-cipher2 = ChaCha20.new(key=secret, nonce=msg_nonce)
-plaintext = cipher2.decrypt(ciphertext)
-
-#print(plaintext)
 
 
 
